@@ -277,7 +277,20 @@ defmodule Indexer.Fetcher.TokenInstance.Helper do
       token_id: token_id,
       token_contract_address_hash: token_contract_address_hash,
       error: error,
-      refetch_after: DateTime.add(DateTime.utc_now(), timeout, :millisecond)
+      refetch_after:
+                  fragment(
+                    """
+                    CASE WHEN EXCLUDED.metadata IS NULL THEN
+                      NOW() AT TIME ZONE 'UTC' + LEAST(interval '1 seconds' * (? * ? ^ (? + 1)), interval '1 milliseconds' * ?)
+                    ELSE
+                      NULL
+                    END
+                    """,
+                    ^coef,
+                    ^base,
+                    fragment("CASE WHEN ? >= 20 THEN 20 ELSE ? END", token_instance.retries_count, token_instance.retries_count),
+                    ^max_refetch_interval
+                  )
     }
   end
 
